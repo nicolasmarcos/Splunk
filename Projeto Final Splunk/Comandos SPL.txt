@@ -1,0 +1,271 @@
+--Instala o docker 
+
+yum -y install docker-io 
+
+  
+
+--Verifica o estado do serviço 
+
+systemctl status docker 
+
+  
+
+--Starta o docker 
+
+systemctl start docker 
+
+  
+
+--Lista os containers ativos 
+
+docker ps 
+
+ 
+
+--Faremos a instalação de uma imagem docker presente no dockerhub 
+
+--Maiores detalhes podem ser consultados no https://hub.docker.com/r/splunk/splunk/ 
+
+docker pull splunk/splunk 
+
+ 
+
+ --Cria um docker container 
+
+--Onde está MINHA_SENHA, coloque a senha desejada 
+
+$ docker run -d -p 8000:8000 -e SPLUNK_START_ARGS=--accept-license -e SPLUNK_PASSWORD=MINHA_SENHA --name splunk splunk/splunk:latest 
+
+  
+
+  
+
+--Cria um docker de splunk com 2 volumes: 1 para processos (var) e outro para dados (etc) 
+
+  
+
+docker run --name splunk-mount -v opt-splunk-etc:/opt/splunk/etc -v opt-splunk-var:/opt/splunk/var/ -d -p 8000:8000 -e SPLUNK_START_ARGS=--accept-license -e SPLUNK_PASSWORD=MINHA_SENHA splunk/splunk:latest 
+
+  
+
+--Lista os volumes 
+
+docker volume ls 
+
+  
+
+--Acessa os volumes no SO 
+
+cd /var/lib/docker/volumes 
+
+  
+
+ls 
+
+  
+
+cd opt-splunk-etc/ 
+
+  
+
+ls 
+
+  
+
+--Para startar um container, verifique o container id através do comando 
+
+Docker os –a 
+
+ 
+
+--Pegue o container id desejado e dê um start o referenciando 
+
+ 
+
+Docker start CONTAINER_ID 
+
+ 
+
+--Nosso container 
+
+Docker start 610247a88e6d 
+
+ 
+
+--Vamos parar e deleter o volume de processos para comprovar que nada ocorreu com os dados 
+
+docker stop splunk-mount 
+
+docker rm splunk-mount 
+
+docker ps 
+
+  
+
+docker volume ls 
+
+  
+
+cd /var/lib/volumes/ 
+
+  
+
+--No splunk 
+
+  
+
+--Verifica a listagem importada pelo Splunk 
+
+source="secure.log" 
+
+  
+
+--Realiza uma plotagem, com base em count de um campo 
+
+source="secure.log" | stats count by src 
+
+  
+
+--Realiza um filtro com base em algum campo identificado pelo splunk 
+
+source="secure.log" action="failure" | stats count by src 
+
+  
+
+--Tras a contagem geral 
+
+source="secure.log" action="failure" | stats count 
+
+  
+
+--Retorna uma search, trazendo campos de iplocation como country e city, com base no SRC 
+
+--Para mais detalhes, veja a documentacao da funcao iplocation do Splunk 
+
+source="secure.log" action="failure" | iplocation src 
+
+  
+
+--Retorna a search em formato tabular com os campos SRC, City e Country 
+
+source="secure.log" action="failure" | iplocation src | table src, City, Country 
+
+  
+
+--Faz a contagem de registros 
+
+--Cidade nem sempre possui, mas pais e confiavel 
+
+source="secure.log" action="failure" | iplocation src | stats count by src, City, Country 
+
+source="secure.log" action="failure" | iplocation src | stats count by Country 
+
+  
+
+--Gera views por dash regional 
+
+source="secure.log" action="failure" | iplocation src | geostats count by Country 
+
+   
+
+  
+
+-----Splunk SPL 
+
+  
+
+--SPL = Splunk Processing Language, forma de escrever consultas no Splunk 
+
+--Ha documentacao presente no site do splunk 
+
+  
+
+--Estrutura por pipes: |  
+
+--Search and filter | munge | report | cleanup 
+
+  
+
+--Ex: source="acess.log" | eval KB=bytes/1024 | stats sum(KB) dc(clientip) | rename sum(KB) as "TotalKilobytes", dc(clientip) as "UniqueCustomer" 
+
+  
+
+--O primeiro campo estamos aplicando um filtro em nossa lista de sources, informando que queremos apenas os eventos do source "acess.log" 
+
+  
+
+--No segundo estamos aplicando munge (transformacao de dados), falando que queremos um campo KB que tem o campo bytes, sendo tenha o bytes/1024, trazendo assim o KB mesmo 
+
+  
+
+--No terceiro estamos aplicando um sum de KB e um distinct count (dc), que nos retornara o total de kbs trafegados e a qtd de clientes que trafegaram 
+
+  
+
+--No quarto aplicamos um rename 
+
+  
+
+--Outro exemplo: source="secure.log" action=failure | iplocation src | table src, Country | uniq 
+
+  
+
+--Splunk Search Assistant 
+
+  
+
+--Ferramenta do splunk que conforme vc esta usando o search, ajuda-lhe a montar a consulta 
+
+--Sintaxe: Secao | command history 
+
+  
+
+  
+
+--Trabalha em 3 modos: full (mostra exemplos) / compact / none 
+
+--full: mostra uma caixa de texto bem intuitiva com explicacao do comando e exemplos 
+
+--compact: da uma leve ajuda na Sintaxe 
+
+--None: nao ajuda nada 
+
+  
+
+--ajustes na mudanca do perfil validos apenas para o seu usuario.  
+
+--Para alterar o modo, na home clique no botao superior do seu usuario > preferences > SPL Editor e altere 
+
+  
+
+--Vc pode exportar searchs como CSV, XML e JSON 
+
+  
+
+--Reports 
+
+  
+
+--Vc pode criar uma search e salva-la como report, para que haja envio de e-mails automatico. Para tal, consulte aula 20 do curso, section 2 em caso de duvidas. 
+
+  
+
+--Crie a search > save as report > Edit report > schedule e determine o horario. Adicione uma trigger de send e-mail e configure o e-mail que quer enviar. Provavelmente, deve ter que fazer uma configuracao no splunk enterprise do servidor de e-mail que vai consumir. 
+
+--Na primeira vez, ele podera nao retornar nada, pq ainda nao houve uma primeira execucao do schedule. 
+
+  
+
+--Na home > Reports, vc pode ver todos os seus reports criados. 
+
+ 
+
+--Em Settings > Server Settings > E-mail settings, vc pode configurar o servidor de e-mail 
+
+ 
+
+--Search para chamar em um dropdown todas as colunas em modo dinâmico 
+
+ 
+
+source="access.log" | stats dc(*) as * | transpose | table column 
